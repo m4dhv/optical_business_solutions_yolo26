@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% block title %}Checkout — Optical Business Solutions{% endblock %}
+
+{% block content %}
+
+<div class="max-w-2xl mx-auto">
+
+  <!-- Back link -->
+  <a href="/"
+    class="inline-flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 text-sm font-semibold mb-6 transition group">
+    <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor"
+      stroke-width="2.5" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+    Back to scanning
+  </a>
+
+  <h1 class="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Checkout</h1>
+  <p class="text-slate-500 dark:text-slate-400 text-sm mt-1 mb-8 font-medium">Review your order and pay securely via
+    Razorpay</p>
+
+  <!-- ── Empty cart guard ─────────────────────────────────────────────── -->
+  <div id="emptyState"
+    class="hidden text-center py-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+    <div class="text-4xl mb-3">🛒</div>
+    <div class="text-slate-700 dark:text-slate-300 font-bold text-lg">Your cart is empty</div>
+    <p class="text-slate-400 dark:text-slate-500 text-sm mt-1">Go back and scan some products first.</p>
+    <a href="/"
+      class="inline-block mt-6 bg-emerald-800 text-white font-bold text-sm py-2.5 px-6 rounded-lg hover:bg-emerald-900 transition">
+      Go to Cart
+    </a>
+  </div>
+
+  <!-- ── Main checkout card ────────────────────────────────────────────── -->
+  <div id="checkoutCard">
+
+    <!-- Bill of Sale -->
+    <div
+      class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs mb-6">
+
+      <div
+        class="bg-emerald-800 dark:bg-emerald-700 text-white text-center font-extrabold text-base py-4 tracking-wide uppercase">
+        Bill of Sale
+      </div>
+
+      <!-- Items table header -->
+      <div
+        class="cart-header flex items-center px-6 py-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <span class="w-8">#</span>
+        <span class="flex-1">Item</span>
+        <span class="w-12 text-center">Qty</span>
+        <span class="w-20 text-right">Price</span>
+        <span class="w-24 text-right">Total</span>
+        <span class="w-28 text-right ml-4"></span>
+      </div>
+
+      <!-- Items rows — injected by JS -->
+      <div id="billBody" class="flex flex-col"></div>
+
+      <!-- Totals -->
+      <div id="billFooter"></div>
+    </div>
+
+    <!--  Pay button -->
+    <div
+      class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xs mb-6">
+      <!-- Customer Phone Input -->
+      <div class="mb-5">
+        <label for="phoneInput" class="block text-slate-500 dark:text-slate-400 text-xs font-extrabold mb-2 uppercase tracking-wider">
+          Customer Phone Number
+        </label>
+        <div class="relative rounded-xl shadow-xs">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+            <span class="text-slate-400 dark:text-slate-500 font-bold text-sm">
+              +91
+            </span>
+          </div>
+          <input type="tel" id="phoneInput" name="phoneInput" maxlength="10" placeholder="Enter 10-digit mobile"
+            class="block w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition duration-150 ease-in-out"
+            pattern="\d{10}" required>
+        </div>
+        <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 font-medium">Required for digital invoice billing and transaction tracking.</p>
+      </div>
+
+      <!-- Error message -->
+      <div id="errorMsg"
+        class="hidden mb-4 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm font-semibold rounded-lg">
+      </div>
+
+      <!-- Pay button -->
+      <button id="payBtn" onclick="initiatePayment()"
+        class="w-full bg-emerald-800 dark:bg-emerald-700 text-white hover:bg-emerald-900 dark:hover:bg-emerald-600 font-extrabold text-sm py-4 px-6 rounded-xl shadow-sm transition flex items-center justify-center gap-2.5 cursor-pointer">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+        </svg>
+        Pay with Razorpay
+      </button>
+    </div>
+
+  </div><!-- /checkoutCard -->
+
+  <!-- ── Success state ─────────────────────────────────────────────────── -->
+  <div id="successState" class="hidden">
+    <div
+      class="text-center p-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs flex flex-col items-center gap-4">
+
+      <div class="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center">
+        <svg class="w-8 h-8 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5"
+          viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+      </div>
+
+      <div class="text-emerald-700 dark:text-emerald-400 font-black text-2xl tracking-tight">Payment Successful!</div>
+      <div id="successMeta" class="text-slate-500 dark:text-slate-400 text-sm text-center leading-relaxed"></div>
+
+      <a id="receiptBtn" href="#" target="_blank"
+        class="bg-emerald-800 dark:bg-emerald-700 text-white hover:bg-emerald-900 font-bold text-sm py-3 px-8 rounded-lg shadow-xs transition mt-2">
+        Print Receipt PDF
+      </a>
+
+      <a href="/"
+        class="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 font-semibold text-xs mt-1 transition">
+        &larr; New Transaction
+      </a>
+    </div>
+  </div>
+
+</div><!-- /max-w -->
+
+{% endblock %}
+
+{% block scripts %}
+<!-- Razorpay SDK loaded here so it works regardless of what blocks base.html defines -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  const RZP_KEY = "{{ razorpay_key }}";
+
+  // ── Read cart saved by customer.html before navigating here ──────────────
+  let cart = {};
+  try {
+    const raw = sessionStorage.getItem('rzp_cart');
+    if (raw) cart = JSON.parse(raw);
+  } catch (e) {
+    cart = {};
+  }
+
+  // ── On load ───────────────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', function () {
+    if (Object.keys(cart).length === 0) {
+      document.getElementById('checkoutCard').classList.add('hidden');
+      document.getElementById('emptyState').classList.remove('hidden');
+      return;
+    }
+    renderBill();
+  });
+
+  // ── Render bill ───────────────────────────────────────────────────────────
+  function renderBill() {
+    var keys = Object.keys(cart);
+    var sub = 0, totalItems = 0;
+    var rows = '';
+
+    keys.forEach(function (name, i) {
+      var qty = cart[name].qty;
+      var price = cart[name].price;
+      var lt = qty * price;
+      sub += lt;
+      totalItems += qty;
+      rows += '<div class="flex items-center px-6 py-3.5 border-b border-slate-100 text-sm text-slate-700 hover:bg-slate-50 transition">'
+        + '<span class="w-8 text-slate-400 font-semibold">' + (i + 1) + '</span>'
+        + '<span class="cart-item-name flex-1 font-bold text-slate-800">' + name + '</span>'
+        + '<span class="w-12 text-center font-extrabold text-emerald-800 bg-emerald-50 py-0.5 rounded">' + qty + '</span>'
+        + '<span class="w-20 text-right text-slate-500 font-medium">&#8377;' + price.toFixed(2) + '</span>'
+        + '<span class="cart-item-total w-24 text-right text-slate-900 font-extrabold">&#8377;' + lt.toFixed(2) + '</span>'
+        + '<span class="w-28 flex gap-1.5 justify-end ml-4"><button class="p-1 hover:bg-slate-100 rounded text-xs border border-slate-200 cursor-pointer" onclick="adjQty(\'' + name + '\',-1)">-</button><button class="p-1 hover:bg-slate-100 rounded text-xs border border-slate-200 cursor-pointer" onclick="adjQty(\'' + name + '\',1)">+</button><button class="p-1 hover:bg-red-50 rounded text-xs border border-red-100 text-red-500 cursor-pointer" onclick="removeItem(\'' + name + '\')">Remove</button></span>'
+        + '</div>';
+    });
+    document.getElementById('billBody').innerHTML = rows;
+
+    var total = sub;
+
+    document.getElementById('billFooter').innerHTML =
+      '<div class="bg-slate-50 border-t border-slate-200 p-6 flex flex-col gap-2.5">'
+      + '<div class="flex justify-between items-center border-t border-dashed border-slate-300 pt-4 mt-2">'
+      + '<span>GRAND TOTAL (' + totalItems + ' item' + (totalItems !== 1 ? 's' : '') + ')</span>'
+      + '<span class="text-3xl font-black text-emerald-800">&#8377;' + total.toFixed(2) + '</span></div></div>';
+
+    sessionStorage.setItem('rzp_cart', JSON.stringify(cart));
+  }
+
+  function adjQty(name, delta) {
+    if (!cart[name]) return;
+    cart[name].qty += delta;
+    if (cart[name].qty <= 0) delete cart[name];
+    if (Object.keys(cart).length === 0) {
+      sessionStorage.removeItem('rzp_cart');
+      document.getElementById('checkoutCard').classList.add('hidden');
+      document.getElementById('emptyState').classList.remove('hidden');
+    } else {
+      renderBill();
+    }
+  }
+
+  function removeItem(name) {
+    delete cart[name];
+    if (Object.keys(cart).length === 0) {
+      sessionStorage.removeItem('rzp_cart');
+      document.getElementById('checkoutCard').classList.add('hidden');
+      document.getElementById('emptyState').classList.remove('hidden');
+    } else {
+      renderBill();
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function showError(msg) {
+    var el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+
+  function clearError() {
+    document.getElementById('errorMsg').classList.add('hidden');
+  }
+
+  function setPayBtnLoading(loading, label) {
+    var btn = document.getElementById('payBtn');
+    if (loading) {
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">'
+        + '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>'
+        + '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> '
+        + (label || 'Please wait…');
+      btn.classList.add('opacity-70', 'cursor-not-allowed');
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">'
+        + '<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg>'
+        + ' Pay with Razorpay';
+      btn.classList.remove('opacity-70', 'cursor-not-allowed');
+    }
+  }
+
+  // ── Main payment flow ─────────────────────────────────────────────────────
+  async function initiatePayment() {
+    clearError();
+
+    var phone = document.getElementById('phoneInput').value.trim();
+    if (!phone || phone.length < 10 || !/^\d{10}$/.test(phone)) {
+      showError('Please enter a valid 10-digit phone number.');
+      return;
+    }
+    if (Object.keys(cart).length === 0) {
+      showError('Cart is empty. Please go back and add items.');
+      return;
+    }
+
+    setPayBtnLoading(true, 'Creating order…');
+
+    // Step 1 — Create Razorpay order on server
+    var order;
+    try {
+      var r = await fetch('/api/razorpay/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cart: cart, phone: phone }),
+      });
+      var data = await r.json();
+      if (!r.ok) throw new Error(data.detail || 'Order creation failed');
+      order = data;
+    } catch (e) {
+      showError('Could not create order: ' + e.message);
+      setPayBtnLoading(false);
+      return;
+    }
+
+    setPayBtnLoading(false);
+
+    // Step 2 — Open Razorpay checkout modal
+    var options = {
+      key: order.key,
+      amount: order.amount,
+      currency: 'INR',
+      name: 'Optical Business Solutions',
+      description: 'Self Checkout Payment',
+      image: '/store_logo.png',
+      order_id: order.order_id,
+      
+      upi: {
+      flow: "collect",
+      },
+
+      readonly: {
+      contact: true,
+      },
+
+      method: {
+      upi: true,
+      card: true,
+      netbanking: true,
+      wallet: true,
+      },
+      prefill: {
+        contact: phone,
+      },
+      theme: {
+        color: '#065f46',
+      },
+      modal: {
+        ondismiss: function () {
+          setPayBtnLoading(false);
+        },
+      },
+
+      // Called by Razorpay after a successful payment
+      handler: async function (response) {
+        setPayBtnLoading(true, 'Verifying payment…');
+
+        try {
+          var vr = await fetch('/api/razorpay/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cart: cart,
+              phone: phone,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          var d = await vr.json();
+          if (!vr.ok) throw new Error(d.detail || 'Verification failed');
+
+          // Clear cart from storage
+          sessionStorage.removeItem('rzp_cart');
+
+          // Show success
+          document.getElementById('checkoutCard').classList.add('hidden');
+          document.getElementById('successState').classList.remove('hidden');
+
+          document.getElementById('successMeta').innerHTML =
+            'Transaction <strong>#' + d.txn_id + '</strong><br>'
+            + 'Payment ID: <code class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-xs font-mono">'
+            + response.razorpay_payment_id + '</code><br>'
+            + 'Amount Paid: <strong>&#8377;' + d.total.toFixed(2) + '</strong>';
+
+          document.getElementById('receiptBtn').href = d.receipt_url;
+
+        } catch (e) {
+          showError(
+            'Payment verification failed: ' + e.message
+            + '. Please contact support with Payment ID: ' + response.razorpay_payment_id
+          );
+          setPayBtnLoading(false);
+        }
+      },
+    };
+
+    var rzpModal = new Razorpay(options);
+    rzpModal.on('payment.failed', function (response) {
+      showError('Payment failed: ' + response.error.description + ' (' + response.error.code + ')');
+      setPayBtnLoading(false);
+    });
+    rzpModal.open();
+  }
+</script>
+{% endblock %}

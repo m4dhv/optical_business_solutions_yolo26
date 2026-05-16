@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}Self Checkout - Optical Business Solutions{% endblock %}
+
+{% block content %}
+
+<h1 class="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Self Checkout</h1>
+<p class="text-slate-500 dark:text-slate-400 text-sm mt-1 mb-8 font-medium">Scan products with the camera to auto-add
+  them to your bill</p>
+
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+  <!-- LEFT: Camera (2/5 Cols) -->
+  <div class="lg:col-span-2 flex flex-col gap-4">
+    <!-- Beautiful Tailwind Toggle Switch -->
+    <div
+      class="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs self-start">
+      <div id="camToggle"
+        class="w-11 h-6 bg-slate-200 dark:bg-slate-800 rounded-full cursor-pointer relative transition-colors duration-200"
+        onclick="toggleCamera()">
+        <div id="camToggleDot"
+          class="absolute top-0.5 left-0.5 w-5 h-5 bg-white dark:bg-slate-950 rounded-full shadow-sm transition-transform duration-200">
+        </div>
+      </div>
+      <span id="camLabel" class="text-slate-700 dark:text-slate-300 font-extrabold text-sm select-none">Start
+        Billing</span>
+    </div>
+
+    <!-- Camera Area -->
+    <div id="cameraArea" class="max-w-[400px] w-full">
+      <div id="camPlaceholder"
+        class="flex flex-col items-center justify-center p-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-dashed rounded-2xl text-slate-400 dark:text-slate-500 text-center gap-3 shadow-xs">
+        <div class="text-xl font-bold">Camera</div>
+        <p class="text-slate-500 dark:text-slate-400 text-sm font-semibold">Toggle the switch to start the camera</p>
+      </div>
+      <div id="camFeed" class="rounded-2xl overflow-hidden bg-black aspect-video w-full shadow-sm hidden">
+        <img id="camImg" alt="Camera Feed" class="w-full h-full object-cover">
+      </div>
+    </div>
+
+    <!-- Detection Summary -->
+    <div id="detSummary" class="text-slate-500 dark:text-slate-400 text-sm italic font-medium max-w-[400px]"></div>
+
+    <!-- Toasts Feed -->
+    <h4 class="text-slate-900 dark:text-slate-100 font-extrabold text-sm uppercase tracking-wider mt-2">Items Added to
+      Cart</h4>
+    <div id="toastFeed" class="flex flex-col gap-2 max-w-[400px]"></div>
+  </div>
+
+  <!-- RIGHT: Bill (3/5 Cols) -->
+  <div id="checkoutColumn" class="lg:col-span-3">
+    <div id="billPanel"
+      class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+      <div
+        class="bg-emerald-800 dark:bg-emerald-700 text-white text-center font-extrabold text-base py-4 rounded-t-2xl tracking-wide uppercase">
+        BILL OF SALE
+      </div>
+      <div id="billBody" class="flex flex-col"></div>
+      <div id="billFooter"></div>
+      <div id="billActions"
+        class="p-4 bg-slate-50 dark:bg-slate-950/40 border-t border-slate-200 dark:border-slate-800"></div>
+    </div>
+
+    <div id="checkoutArea" class="hidden mt-6">
+      <button onclick="goToCheckout()"
+        class="w-full bg-emerald-800 dark:bg-emerald-700 text-white hover:bg-emerald-900 dark:hover:bg-emerald-600 font-extrabold text-sm py-4 px-6 rounded-xl shadow-sm transition flex items-center justify-center gap-2.5 cursor-pointer">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+        </svg>
+        Proceed to Checkout
+      </button>
+      <p class="text-center text-slate-400 dark:text-slate-500 text-xs mt-2 font-medium">Pay securely via Razorpay</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let ws = null;
+  let cameraOn = false;
+  let cart = {}; // {name: {qty, price}}
+  let toasts = [];
+
+  function applySettings() {
+    if (cameraOn) {
+      stopCamera();
+      startCamera();
+      addToast('Settings applied & feed restarted!', 'add');
+    } else {
+      addToast('Settings updated successfully!', 'add');
+    }
+    toggleSidebar();
+  }
+
+  function toggleCamera() {
+    cameraOn = !cameraOn;
+    const tog = document.getElementById('camToggle');
+    const dot = document.getElementById('camToggleDot');
+    const lbl = document.getElementById('camLabel');
+
+    if (cameraOn) {
+      tog.classList.remove('bg-slate-200');
+      tog.classList.add('bg-emerald-600');
+      dot.classList.add('translate-x-5');
+      lbl.textContent = 'Stop Billing';
+      startCamera();
+    } else {
+      tog.classList.remove('bg-emerald-600');
+      tog.classList.add('bg-slate-200');
+      dot.classList.remove('translate-x-5');
+      lbl.textContent = 'Start Billing';
+      stopCamera();
+    }
+  }
+
+  function startCamera() {
+    document.getElementById('camPlaceholder').classList.add('hidden');
+    document.getElementById('camFeed').classList.remove('hidden');
+
+    // Read settings
+    const model = document.getElementById('settingModel').value;
+    const camera = parseInt(document.getElementById('settingCamera').value);
+    const res = parseInt(document.getElementById('settingRes').value);
+    const conf = parseFloat(document.getElementById('settingConf').value);
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}/ws/camera`);
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        model: model,
+        camera: camera,
+        confidence: conf,
+        img_size: res,
+        mode: 'customer'
+      }));
+    };
+    ws.onmessage = (e) => {
+      const d = JSON.parse(e.data);
+      if (d.error) { addToast(d.error, 'oos'); stopCamera(); return; }
+      if (d.frame) document.getElementById('camImg').src = 'data:image/jpeg;base64,' + d.frame;
+      if (d.counts && Object.keys(d.counts).length > 0) {
+        document.getElementById('detSummary').innerHTML = Object.entries(d.counts).map(([n, c]) => `<b class="text-slate-800 dark:text-slate-100">${n}</b>: ${c}`).join(' | ');
+      } else {
+        document.getElementById('detSummary').textContent = 'Waiting for products...';
+      }
+      if (d.new_items) d.new_items.forEach(handleNewItem);
+    };
+    ws.onclose = () => {
+      if (cameraOn) {
+        cameraOn = false;
+        const tog = document.getElementById('camToggle');
+        const dot = document.getElementById('camToggleDot');
+        const lbl = document.getElementById('camLabel');
+        tog.classList.remove('bg-emerald-600');
+        tog.classList.add('bg-slate-200');
+        dot.classList.remove('translate-x-5');
+        lbl.textContent = 'Start Billing';
+      }
+    };
+  }
+
+  function stopCamera() {
+    if (ws) { try { ws.send(JSON.stringify({ action: 'stop' })); } catch (e) { } ws.close(); ws = null; }
+    document.getElementById('camFeed').classList.add('hidden');
+    document.getElementById('camPlaceholder').classList.remove('hidden');
+    document.getElementById('detSummary').textContent = '';
+  }
+
+  function handleNewItem(item) {
+    if (!item.in_stock) {
+      addToast(`<b>${item.name}</b> — out of stock`, 'oos');
+      return;
+    }
+    const existing = cart[item.name];
+    if (existing) {
+      cart[item.name].qty += 1;
+    } else {
+      cart[item.name] = { qty: 1, price: item.price };
+    }
+    addToast(`<b>${item.name}</b> added <span class="bg-emerald-200 text-emerald-950 px-1.5 py-0.5 rounded text-xs font-bold ml-1">×${cart[item.name].qty}</span>`, 'add');
+    renderBill();
+  }
+
+  function addToast(html, type) {
+    const cssClass = type === 'add'
+      ? 'p-3 rounded-2xl text-sm font-semibold bg-emerald-50 border border-emerald-100 text-emerald-800 shadow-xs'
+      : 'p-3 rounded-2xl text-sm font-semibold bg-red-50 border border-red-100 text-red-700 shadow-xs';
+    toasts.unshift({ html, cssClass });
+    if (toasts.length > 8) toasts.pop();
+    renderToasts();
+  }
+
+  function renderToasts() {
+    document.getElementById('toastFeed').innerHTML = toasts
+      .map((toast, i) => `<div class="${toast.cssClass}" onclick="dismissToast(${i})" title="Dismiss">${toast.html}</div>`)
+      .join('');
+  }
+
+  function dismissToast(index) {
+    toasts.splice(index, 1);
+    renderToasts();
+  }
+
+  function renderBill() {
+    const keys = Object.keys(cart);
+    const body = document.getElementById('billBody');
+    const footer = document.getElementById('billFooter');
+    const actions = document.getElementById('billActions');
+    const checkArea = document.getElementById('checkoutArea');
+
+    if (keys.length === 0) {
+      body.innerHTML = '<div class="text-center py-16 px-6 text-slate-400 flex flex-col items-center gap-2"><div class="text-xl font-bold">Cart</div><p class="font-semibold text-slate-500">Start the camera and place items in front to begin billing.</p></div>';
+      footer.innerHTML = '';
+      actions.innerHTML = '';
+      checkArea.classList.add('hidden');
+      return;
+    }
+
+    let rows = '<div class="cart-header flex items-center px-6 py-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider"><span class="w-8">#</span><span class="flex-1">Item</span><span class="w-12 text-center">Qty</span><span class="w-20 text-right">Price</span><span class="w-24 text-right">Total</span><span class="w-28 text-right ml-4"></span></div>';
+    let sub = 0;
+    let totalItems = 0;
+    keys.forEach((name, i) => {
+      const info = cart[name];
+      const lt = info.qty * info.price;
+      sub += lt;
+      totalItems += info.qty;
+      rows += `<div class="flex items-center px-6 py-3.5 border-b border-slate-100 text-sm text-slate-700 hover:bg-slate-50 transition"><span class="w-8 text-slate-400 font-semibold">${i + 1}</span><span class="cart-item-name flex-1 font-bold text-slate-800">${name}</span><span class="w-12 text-center font-extrabold text-emerald-800 bg-emerald-50 py-0.5 rounded">${info.qty}</span><span class="w-20 text-right text-slate-500 font-medium">₹${info.price.toFixed(2)}</span><span class="cart-item-total w-24 text-right text-slate-900 font-extrabold">₹${lt.toFixed(2)}</span><span class="w-28 flex gap-1.5 justify-end ml-4"><button class="p-1 hover:bg-slate-100 rounded text-xs border border-slate-200 cursor-pointer" onclick="adjQty('${name}',-1)">-</button><button class="p-1 hover:bg-slate-100 rounded text-xs border border-slate-200 cursor-pointer" onclick="adjQty('${name}',1)">+</button><button class="p-1 hover:bg-red-50 rounded text-xs border border-red-100 text-red-500 cursor-pointer" onclick="removeItem('${name}')">Remove</button></span></div>`;
+    });
+    body.innerHTML = rows;
+
+    const total = sub;
+    footer.innerHTML = `<div class="bg-slate-50 border-t border-slate-200 p-6 flex flex-col gap-2.5"><div class="flex justify-between items-center border-t border-dashed border-slate-300 pt-4 mt-2"><span>GRAND TOTAL (${totalItems} items)</span><span class="text-3xl font-black text-emerald-800">₹${total.toFixed(2)}</span></div></div>`;
+    actions.innerHTML = '<button class="bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 font-bold text-sm py-2.5 px-4 rounded-lg shadow-sm transition w-full text-center cursor-pointer" onclick="clearCart()">Clear Entire Cart</button>';
+    checkArea.classList.remove('hidden');
+  }
+
+  function adjQty(name, delta) {
+    if (!cart[name]) return;
+    cart[name].qty += delta;
+    if (cart[name].qty <= 0) delete cart[name];
+    renderBill();
+  }
+  function removeItem(name) { delete cart[name]; renderBill(); }
+  function clearCart() {
+    cart = {}; toasts = [];
+    document.getElementById('toastFeed').innerHTML = '';
+    if (ws) try { ws.send(JSON.stringify({ action: 'reset_tracks' })); } catch (e) { }
+    renderBill();
+  }
+
+  function goToCheckout() {
+    if (Object.keys(cart).length === 0) { alert('Cart is empty'); return; }
+    // Save cart to sessionStorage so checkout.html can read it
+    try {
+      sessionStorage.setItem('rzp_cart', JSON.stringify(cart));
+    } catch (e) {
+      alert('Could not save cart data. Please try again.');
+      return;
+    }
+    window.location.href = '/checkout';
+  }
+
+  // Initial render
+  renderBill();
+</script>
+{% endblock %}

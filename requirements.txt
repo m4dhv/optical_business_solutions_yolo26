@@ -1,0 +1,12 @@
+fastapi
+fpdf2
+opencv-python
+pandas<3.0
+requests
+streamlit
+ultralytics
+uvicorn[standard]
+jinja2
+python-multipart
+razorpay
+python-dotenv

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+
+# Database
+*.db
+!backend/schema.sql  # If you had one, you'd keep it. But store.db is binary.
+
+# Secrets and sensitive data
+card details.txt
+secrets.json
+
+# Local receipts and logs
+receipts/*.pdf
+logs/
+
+# IDEs
+.vscode/
+.idea/
+
+# UI Frameworks
+flet/
+
+# Large files and training artifacts
+training notebooks/*.zip
+weights/*.onnx
+weights/best_nano_saved_model.zip
+
+# Large files (YOLO weights)
+# weights/

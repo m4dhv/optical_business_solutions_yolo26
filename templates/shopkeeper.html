@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% block title %}Shopkeeper Portal - Optical Business Solutions{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Shopkeeper Portal</h1>
+<p class="page-subtitle">Scan products to register or update inventory in real-time</p>
+
+<div class="tab-panel active" id="tab-scanner">
+  <div class="grid-2">
+    <!-- LEFT: Camera -->
+    <div>
+      <h3 style="color:var(--text-primary);">Live Feed</h3>
+      <div class="toggle-wrap">
+        <div class="toggle" id="camToggle" onclick="toggleCamera()"></div>
+        <span id="camLabel" style="color:var(--text-secondary);font-weight:600;">Start Camera</span>
+      </div>
+      <div id="cameraArea">
+        <div class="camera-placeholder" id="camPlaceholder">
+          <div class="icon">Camera</div>
+          <p>Point the camera at a product to detect and update stock</p>
+        </div>
+        <div class="camera-feed hidden" id="camFeed"><img id="camImg" alt="Camera"></div>
+      </div>
+      <div class="det-summary" id="detSummary"></div>
+      <div class="flex gap-2 mt-2">
+        <div class="metric" style="flex:1">
+          <div class="label">Frames</div>
+          <div class="value" id="frameCount">0</div>
+        </div>
+        <div class="metric" style="flex:1">
+          <div class="label">Saves</div>
+          <div class="value" id="saveCount">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Panel -->
+    <div>
+      <h3 style="color:var(--text-primary);">Inventory</h3>
+      <!-- Detection Alert & Form -->
+      <div id="detectionAlert"></div>
+      <div id="updateForm" class="hidden card mt-1">
+        <div class="card-body">
+          <h4 id="formTitle" class="mb-1" style="color:var(--text-primary);"></h4>
+          <div class="form-group"><label>Price (₹)</label><input type="number" id="formPrice" min="0" step="1"></div>
+          <div class="form-group"><label>Add Quantity</label><input type="number" id="formQty" value="0" min="0"
+              step="1"></div>
+          <div class="flex gap-1 mt-1">
+            <button class="btn btn-primary" style="flex:1" onclick="saveProduct()">Save</button>
+            <button class="btn btn-ghost" onclick="dismissForm()">✖ Dismiss</button>
+          </div>
+        </div>
+      </div>
+      <p id="formHint" class="text-muted mt-1" style="font-size:0.85rem;">Point the camera at an item to detect and
+        update stock.</p>
+
+      <hr class="divider">
+      <div class="flex-between mb-1">
+        <h4 style="color:var(--text-primary);">📋 Stock</h4>
+        <input type="text" id="searchBox" placeholder="Search products..." style="width:200px" oninput="loadProducts()">
+      </div>
+      <div id="productTable" style="max-height:300px;overflow-y:auto;"></div>
+
+      <hr class="divider">
+      <h4 class="mb-1" style="color:var(--text-primary);">🚨 Low Stock Alerts</h4>
+      <div id="alertsArea"></div>
+
+      <hr class="divider">
+      <button class="btn btn-primary btn-block" onclick="telegramSummary()">Send Telegram Summary</button>
+    </div>
+  </div>
+</div>
+<br>
+<div class="tab-panel" id="tab-transactions">
+  <h2 class="mb-1" style="color:var(--text-primary);">Recent Transactions</h2>
+  <div class="card">
+    <div class="card-body" style="padding:0;">
+      <div id="txnTable" style="max-height:500px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let ws = null, cameraOn = false, frames = 0, saves = 0;
+  let pendingItem = null;
+  let allProducts = [];
+  let sortCol = 'name';
+  let sortDesc = false;
+
+  function toggleCamera() {
+    cameraOn = !cameraOn;
+    document.getElementById('camToggle').classList.toggle('on', cameraOn);
+    document.getElementById('camLabel').textContent = cameraOn ? 'Stop Camera' : 'Start Camera';
+    if (cameraOn) startCamera(); else stopCamera();
+  }
+
+  function startCamera() {
+    if (pendingItem) return; // Don't start if form is open
+    document.getElementById('camPlaceholder').classList.add('hidden');
+    document.getElementById('camFeed').classList.remove('hidden');
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}/ws/camera`);
+    ws.onopen = () => { ws.send(JSON.stringify({ model: 'Medium', camera: 0, confidence: 0.5, img_size: 640, mode: 'shopkeeper' })); };
+    ws.onmessage = (e) => {
+      const d = JSON.parse(e.data);
+      if (d.error) { stopCamera(); return; }
+      if (d.frame) document.getElementById('camImg').src = 'data:image/jpeg;base64,' + d.frame;
+      frames++; document.getElementById('frameCount').textContent = frames;
+      if (d.counts && Object.keys(d.counts).length) {
+        document.getElementById('detSummary').innerHTML = Object.entries(d.counts).map(([n, c]) => `<b>${n}</b>: ${c}`).join(' | ');
+      } else {
+        document.getElementById('detSummary').textContent = 'No detections.';
+      }
+      if (d.new_items && d.new_items.length > 0) {
+        const item = d.new_items[0];
+        pendingItem = item.name;
+        stopCamera();
+        showForm(item);
+      }
+    };
+    ws.onclose = () => { };
+  }
+
+  function stopCamera() {
+    if (ws) { try { ws.send(JSON.stringify({ action: 'stop' })); } catch (e) { } ws.close(); ws = null; }
+    document.getElementById('camFeed').classList.add('hidden');
+    document.getElementById('camPlaceholder').classList.remove('hidden');
+  }
+
+  function showForm(item) {
+    document.getElementById('detectionAlert').innerHTML = `<div class="alert alert-info"><b>${item.name}</b> detected (${Math.round(item.confidence * 100)}%)<br><span>Current Stock: <b>${item.current_qty}</b> units</span></div>`;
+    document.getElementById('formTitle').textContent = `Update inventory for: ${item.name}`;
+    document.getElementById('formPrice').value = item.current_price;
+    document.getElementById('formQty').value = 0;
+    document.getElementById('updateForm').classList.remove('hidden');
+    document.getElementById('formHint').classList.add('hidden');
+  }
+
+  async function saveProduct() {
+    const name = pendingItem;
+    const price = parseFloat(document.getElementById('formPrice').value);
+    const qty = parseInt(document.getElementById('formQty').value) || 0;
+    const r = await fetch('/api/products/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, price, add_qty: qty }) });
+    const d = await r.json();
+    if (d.ok) {
+      saves++; document.getElementById('saveCount').textContent = saves;
+      document.getElementById('detectionAlert').innerHTML = `<div class="alert alert-success">${name}: ${d.product.quantity} units, ₹${d.product.price.toFixed(2)}</div>`;
+    }
+    dismissForm();
+    loadProducts();
+    loadAlerts();
+  }
+
+  function dismissForm() {
+    pendingItem = null;
+    document.getElementById('updateForm').classList.add('hidden');
+    document.getElementById('formHint').classList.remove('hidden');
+    if (cameraOn) startCamera();
+  }
+
+  async function loadProducts() {
+    const q = document.getElementById('searchBox').value;
+    const url = q ? `/api/products?q=${encodeURIComponent(q)}` : '/api/products';
+    allProducts = await (await fetch(url)).json();
+    doSort();
+  }
+
+  function handleSort(col) {
+    if (sortCol === col) {
+      sortDesc = !sortDesc;
+    } else {
+      sortCol = col;
+      sortDesc = false;
+    }
+    doSort();
+  }
+
+  function doSort() {
+    allProducts.sort((a, b) => {
+      let valA = a[sortCol];
+      let valB = b[sortCol];
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+      if (valA < valB) return sortDesc ? 1 : -1;
+      if (valA > valB) return sortDesc ? -1 : 1;
+      return 0;
+    });
+    renderTable();
+  }
+
+  function getSortIcon(col) {
+    if (sortCol !== col) return '<span style="opacity:0.3; font-size:0.7em; margin-left:4px;">↕</span>';
+    return sortDesc ? '<span style="font-size:0.7em; margin-left:4px;">▼</span>' : '<span style="font-size:0.7em; margin-left:4px;">▲</span>';
+  }
+
+  function renderTable() {
+    if (!allProducts.length) {
+      document.getElementById('productTable').innerHTML = '<p class="text-muted">No products found.</p>';
+      return;
+    }
+    let html = `<table class="data-table">
+    <thead>
+      <tr>
+        <th style="cursor:pointer; user-select:none;" onclick="handleSort('name')" title="Sort by Name">Name ${getSortIcon('name')}</th>
+        <th style="cursor:pointer; user-select:none;" onclick="handleSort('price')" title="Sort by Price">Price (₹) ${getSortIcon('price')}</th>
+        <th style="cursor:pointer; user-select:none;" onclick="handleSort('quantity')" title="Sort by Quantity">Qty ${getSortIcon('quantity')}</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>`;
+    allProducts.forEach(p => {
+      html += `<tr>
+      <td style="font-weight:700;">${p.name}</td>
+      <td style="font-weight:600; color:var(--text-primary);">₹${p.price.toFixed(2)}</td>
+      <td style="font-weight:800; color:var(--flow-green);">${p.quantity}</td>
+      <td class="${p.status === 'In Stock' ? 'status-in' : 'status-out'}">${p.status}</td>
+    </tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('productTable').innerHTML = html;
+  }
+
+  async function loadAlerts() {
+    const data = await (await fetch('/api/products/low-stock?threshold=3')).json();
+    if (!data.length) { document.getElementById('alertsArea').innerHTML = '<div class="alert alert-success">All products well stocked!</div>'; return; }
+    document.getElementById('alertsArea').innerHTML = data.map(p => `<div class="alert ${p.quantity === 0 ? 'alert-error' : 'alert-warning'}"><b>${p.name}</b> — ${p.quantity} left</div>`).join('');
+  }
+
+  async function telegramSummary() {
+    const r = await fetch('/api/telegram-summary', { method: 'POST' });
+    const d = await r.json();
+    alert(d.ok ? 'Telegram summary sent!' : 'Error: ' + d.error);
+  }
+
+  let txnTransactions = [];
+  let txnSortCol = 'id';
+  let txnSortDesc = true;
+
+  async function loadTxns() {
+    let raw = await (await fetch('/api/transactions?limit=500')).json();
+    txnTransactions = raw.map(t => {
+      t._items = t.items ? t.items.reduce((s, i) => s + (i.qty || 1), 0) : 0;
+      return t;
+    });
+    doTxnSort();
+  }
+
+  function handleTxnSort(col) {
+    if (txnSortCol === col) {
+      txnSortDesc = !txnSortDesc;
+    } else {
+      txnSortCol = col;
+      txnSortDesc = false;
+    }
+    doTxnSort();
+  }
+
+  function doTxnSort() {
+    txnTransactions.sort((a, b) => {
+      let valA = a[txnSortCol];
+      let valB = b[txnSortCol];
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+      if (valA < valB) return txnSortDesc ? 1 : -1;
+      if (valA > valB) return txnSortDesc ? -1 : 1;
+      return 0;
+    });
+    renderTxnTable();
+  }
+
+  function getTxnSortIcon(col) {
+    if (txnSortCol !== col) return '<span style="opacity:0.3; font-size:0.7em; margin-left:4px;">↕</span>';
+    return txnSortDesc ? '<span style="font-size:0.7em; margin-left:4px;">▼</span>' : '<span style="font-size:0.7em; margin-left:4px;">▲</span>';
+  }
+
+  function renderTxnTable() {
+    if (!txnTransactions.length) {
+      document.getElementById('txnTable').innerHTML = '<p class="text-muted" style="padding:1.5rem;text-align:center;">No recent transactions.</p>';
+      return;
+    }
+    let html = `<table class="data-table">
+    <thead>
+      <tr>
+        <th style="cursor:pointer; user-select:none;" onclick="handleTxnSort('id')" title="Sort by Txn #">Txn # ${getTxnSortIcon('id')}</th>
+        <th style="cursor:pointer; user-select:none;" onclick="handleTxnSort('timestamp')" title="Sort by Date">Date ${getTxnSortIcon('timestamp')}</th>
+        <th>Phone</th>
+        <th style="cursor:pointer; user-select:none;" onclick="handleTxnSort('_items')" title="Sort by Items">Items ${getTxnSortIcon('_items')}</th>
+        <th style="cursor:pointer; user-select:none;" onclick="handleTxnSort('total')" title="Sort by Total">Total (₹) ${getTxnSortIcon('total')}</th>
+      </tr>
+    </thead>
+    <tbody>`;
+    txnTransactions.forEach(t => {
+      html += `<tr>
+      <td>${t.id}</td>
+      <td style="font-size:0.82rem;color:var(--text-muted)">${t.timestamp}</td>
+      <td>${t.phone || '-'}</td>
+      <td>${t._items} items</td>
+      <td style="color:var(--green-text);font-weight:700;">₹${t.total.toFixed(2)}</td>
+    </tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('txnTable').innerHTML = html;
+  }
+
+  function updateTabsFromHash() {
+    const hash = window.location.hash || '#scanner';
+    if (hash === '#transactions') {
+      document.getElementById('tab-scanner').classList.remove('active');
+      document.getElementById('tab-transactions').classList.add('active');
+      if (document.getElementById('nav-shopkeeper')) document.getElementById('nav-shopkeeper').className = "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white font-semibold px-4 py-2 rounded-lg text-sm transition";
+      if (document.getElementById('nav-transactions')) document.getElementById('nav-transactions').className = "bg-emerald-800 dark:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition";
+      loadTxns();
+    } else {
+      document.getElementById('tab-transactions').classList.remove('active');
+      document.getElementById('tab-scanner').classList.add('active');
+      if (document.getElementById('nav-transactions')) document.getElementById('nav-transactions').className = "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white font-semibold px-4 py-2 rounded-lg text-sm transition";
+      if (document.getElementById('nav-shopkeeper')) document.getElementById('nav-shopkeeper').className = "bg-emerald-800 dark:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition";
+    }
+  }
+
+  window.addEventListener('hashchange', updateTabsFromHash);
+
+  loadProducts(); loadAlerts();
+  updateTabsFromHash();
+</script>
+{% endblock %}

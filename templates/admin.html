@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard - Optical Business Solutions{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Backend & Admin Dashboard</h1>
+<p class="page-subtitle">System management and user administration</p>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('settings',this)">System Settings</button>
+  <button class="tab-btn" onclick="switchTab('users',this)">User Management</button>
+</div>
+
+<!-- Settings Tab -->
+<div class="tab-panel active" id="tab-settings">
+  <h3 class="mb-1" style="color:var(--text-primary);">Model Configuration Defaults</h3>
+  <div class="card">
+    <div class="card-body">
+      <div class="form-group">
+        <label>Default YOLO Model</label>
+        <select>
+          <option>Nano</option>
+          <option>Small</option>
+          <option selected>Medium</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>System-wide Confidence Threshold</label>
+        <input type="number" value="0.5" min="0" max="1" step="0.05">
+      </div>
+    </div>
+  </div>
+  <hr class="divider">
+  <h3 class="mb-1" style="color:var(--red);">Reset Database</h3>
+  <div class="card" style="border-color:var(--red-border);">
+    <div class="card-body">
+      <p class="mb-1" style="color:var(--red);font-weight:600;">Actions here cannot be undone.</p>
+      <button class="btn btn-danger" onclick="confirmReset()">Factory Reset Database</button>
+      <div id="resetMsg" class="mt-1"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Users Tab -->
+<div class="tab-panel" id="tab-users">
+  <h3 class="mb-1" style="color:var(--text-primary);">Manage Staff Access</h3>
+
+  <!-- Create New User Card -->
+  <div class="card mb-2" style="border-color:var(--accent-border,#334155);">
+    <div class="card-body">
+      <h4 style="color:var(--accent,#6366f1);margin:0 0 1rem 0;font-size:1rem;">
+        Create New User
+      </h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:.75rem;align-items:end;">
+        <div class="form-group" style="margin:0;">
+          <label for="nu-username">Username</label>
+          <input id="nu-username" type="text" placeholder="e.g. staff01" autocomplete="off">
+        </div>
+        <div class="form-group" style="margin:0;position:relative;">
+          <label for="nu-password">Password</label>
+          <input id="nu-password" type="password" placeholder="Password" autocomplete="new-password">
+          <button onclick="togglePw()" title="Show/hide password"
+            style="position:absolute;right:.5rem;bottom:.55rem;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.85rem;padding:0;line-height:1;"
+            id="pw-eye">Show</button>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="nu-role">Role</label>
+          <select id="nu-role">
+            <option value="Inventory Support">Inventory Manager</option>
+            <option value="Shopkeeper">Shopkeeper</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="createUser()" id="create-user-btn"
+          style="white-space:nowrap;height:2.4rem;">Create User</button>
+      </div>
+      <div id="create-user-msg" class="mt-1"></div>
+    </div>
+  </div>
+
+  <!-- Existing Users Table -->
+  <div class="card">
+    <div class="card-body" style="padding:0;">
+      <div id="usersTableWrap"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+    if (name === 'users') loadUsers();
+  }
+
+  async function confirmReset() {
+    if (!confirm('This will DELETE all products and transactions. Are you sure?')) return;
+    if (!confirm('FINAL WARNING: This action cannot be undone. Proceed?')) return;
+    const r = await fetch('/api/reset-db', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('resetMsg').innerHTML =
+        '<div class="alert alert-success">Database completely cleared and re-seeded.</div>';
+    }
+  }
+
+  /* ── User Management ─────────────────────────────────────── */
+  async function loadUsers() {
+    const wrap = document.getElementById('usersTableWrap');
+    wrap.innerHTML = '<p class="text-muted" style="padding:1rem;text-align:center;">Loading...</p>';
+    try {
+      const users = await (await fetch('/api/users')).json();
+      renderUsers(users);
+    } catch (e) {
+      wrap.innerHTML = '<p class="text-muted" style="padding:1rem;text-align:center;">Failed to load users.</p>';
+    }
+  }
+
+  function renderUsers(users) {
+    if (!users.length) {
+      document.getElementById('usersTableWrap').innerHTML =
+        '<p class="text-muted" style="padding:1rem;text-align:center;">No users found.</p>';
+      return;
+    }
+    const roleBadge = r => {
+      const colours = {
+        'Administrator': '#ef4444',
+        'Shopkeeper': '#10b981',
+        'Inventory Support': '#6366f1',
+      };
+      const c = colours[r] || '#64748b';
+      return `<span style="background:${c}22;color:${c};padding:.15rem .55rem;border-radius:99px;font-size:.78rem;font-weight:600;">${r}</span>`;
+    };
+    let html = `<table class="data-table">
+      <thead><tr><th>#</th><th>Username</th><th>Role</th><th>Status</th><th>Action</th></tr></thead><tbody>`;
+    users.forEach(u => {
+      const canRemove = u.role !== 'Administrator';
+      const removeBtn = canRemove
+        ? `<button class="btn btn-danger" style="padding:.2rem .65rem;font-size:.78rem;" onclick="removeUser('${u.username}', this)">Remove</button>`
+        : `<span style="color:var(--text-muted);font-size:.78rem;">Restricted</span>`;
+      html += `<tr>
+        <td style="color:var(--text-muted);font-size:.8rem;">${u.id}</td>
+        <td style="font-weight:600;">${u.username}</td>
+        <td>${roleBadge(u.role)}</td>
+        <td><span style="color:#10b981;font-weight:600;">Active</span></td>
+        <td>${removeBtn}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('usersTableWrap').innerHTML = html;
+  }
+
+  async function removeUser(username, btn) {
+    if (!confirm(`Remove user "${username}"? This cannot be undone.`)) return;
+    btn.disabled = true;
+    btn.textContent = 'Removing...';
+    try {
+      const r = await fetch(`/api/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
+      const d = await r.json();
+      if (r.ok && d.ok) {
+        loadUsers();
+      } else {
+        alert(d.detail || 'Failed to remove user.');
+        btn.disabled = false;
+        btn.textContent = 'Remove';
+      }
+    } catch (e) {
+      alert('Network error.');
+      btn.disabled = false;
+      btn.textContent = 'Remove';
+    }
+  }
+
+  async function createUser() {
+    const username = document.getElementById('nu-username').value.trim();
+    const password = document.getElementById('nu-password').value.trim();
+    const role = document.getElementById('nu-role').value;
+    const msgEl = document.getElementById('create-user-msg');
+    const btn = document.getElementById('create-user-btn');
+
+    if (!username || !password) {
+      msgEl.innerHTML = '<div class="alert alert-danger" style="padding:.5rem .75rem;">Username and password are required.</div>';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+    msgEl.innerHTML = '';
+
+    try {
+      const r = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, role }),
+      });
+      const d = await r.json();
+      if (r.ok && d.ok) {
+        msgEl.innerHTML = `<div class="alert alert-success" style="padding:.5rem .75rem;">User <strong>${username}</strong> created as <strong>${role}</strong>.</div>`;
+        document.getElementById('nu-username').value = '';
+        document.getElementById('nu-password').value = '';
+        loadUsers();
+      } else {
+        msgEl.innerHTML = `<div class="alert alert-danger" style="padding:.5rem .75rem;">${d.detail || 'Failed to create user.'}</div>`;
+      }
+    } catch (e) {
+      msgEl.innerHTML = '<div class="alert alert-danger" style="padding:.5rem .75rem;">Network error.</div>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Create User';
+    }
+  }
+
+  function togglePw() {
+    const inp = document.getElementById('nu-password');
+    const eye = document.getElementById('pw-eye');
+    if (inp.type === 'password') { inp.type = 'text'; eye.textContent = 'Hide'; }
+    else { inp.type = 'password'; eye.textContent = 'Show'; }
+  }
+</script>
+{% endblock %}

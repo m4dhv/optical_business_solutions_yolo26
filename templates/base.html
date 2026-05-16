@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Optical Business Solutions - Smart Grocery Retail powered by AI Vision">
+  <title>{% block title %}Optical Business Solutions{% endblock %}</title>
+  <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+  <style>
+    /* Global Proper Table Styling for Both Light and Dark Modes */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    .data-table th {
+      background-color: #f8fafc;
+      color: #475569;
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.875rem 1.5rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .data-table td {
+      padding: 1rem 1.5rem;
+      font-size: 0.875rem;
+      color: #1f2937;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .data-table tr:hover {
+      background-color: #f8fafc;
+    }
+
+    /* Dark Mode Table overrides */
+    .dark .data-table th {
+      background-color: #0f172a;
+      color: #94a3b8;
+      border-bottom-color: #334155;
+    }
+    .dark .data-table td {
+      color: #cbd5e1;
+      border-bottom-color: #1e293b;
+    }
+    .dark .data-table tr:hover {
+      background-color: #1e293b;
+    }
+
+    /* Status Badges */
+    .status-in {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: 0.375rem;
+      background-color: #dcfce7;
+      color: #166534;
+    }
+    .status-out {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: 0.375rem;
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+    .dark .status-in {
+      background-color: rgba(22, 101, 52, 0.2);
+      color: #4ade80;
+    }
+    .dark .status-out {
+      background-color: rgba(153, 27, 27, 0.2);
+      color: #f87171;
+    }
+  </style>
+  <link rel="stylesheet" href="/static/css/style.css?v=5">
+  <script>
+    // Theme initializer
+    if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  </script>
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-200">
+  <!-- NAV BAR -->
+  <nav class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 px-6 py-4 flex items-center justify-between transition-colors">
+    <a href="/" class="flex items-center gap-2.5 text-emerald-800 dark:text-emerald-400 font-extrabold text-xl no-underline">
+      <img src="/store_logo.png" alt="Logo" class="h-8 w-auto rounded-md shadow-sm" onerror="this.style.display='none'">
+      <span>Optical Business Solutions</span>
+    </a>
+    <div class="flex gap-1" id="navLinks">
+
+      {% if user.role in ['Shopkeeper', 'Administrator'] %}
+        <a href="/shopkeeper#scanner" id="nav-shopkeeper" class="{% if request.url.path == '/shopkeeper' %}bg-emerald-800 dark:bg-emerald-700 text-white{% else %}text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white{% endif %} font-semibold px-4 py-2 rounded-lg text-sm transition">Shopkeeper</a>
+        <a href="/shopkeeper#transactions" id="nav-transactions" class="text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white font-semibold px-4 py-2 rounded-lg text-sm transition">Transactions</a>
+      {% endif %}
+      {% if user.role in ['Shopkeeper', 'Inventory Support', 'Administrator'] %}
+        <a href="/inventory" id="nav-inventory" class="{% if request.url.path == '/inventory' %}bg-emerald-800 dark:bg-emerald-700 text-white{% else %}text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white{% endif %} font-semibold px-4 py-2 rounded-lg text-sm transition">Inventory</a>
+      {% endif %}
+      {% if user.role == 'Administrator' %}
+        <a href="/admin" class="{% if request.url.path == '/admin' %}bg-emerald-800 dark:bg-emerald-700 text-white{% else %}text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white{% endif %} font-semibold px-4 py-2 rounded-lg text-sm transition">Admin</a>
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Dark Mode Toggle -->
+      <button onclick="toggleDarkMode()" class="h-12 w-12 rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition cursor-pointer" title="Toggle Theme" aria-label="Toggle theme">
+        <svg class="h-8 w-8 text-black block dark:hidden" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
+        </svg>
+        <svg class="h-8 w-8 text-white hidden dark:block" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"></path>
+        </svg>
+      </button>
+
+      {% if user.user %}
+        <span class="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-3 py-1.5 rounded-md text-xs font-bold tracking-wide uppercase">{{ user.role }}</span>
+        <button class="text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white font-semibold px-4 py-2 rounded-lg text-sm transition cursor-pointer" onclick="logout()">Logout</button>
+      {% endif %}
+
+      <!-- Shifted Settings & Login Button -->
+      <button onclick="handleSettingsBtn()" class="h-12 w-12 rounded-lg p-2 bg-emerald-800 dark:bg-emerald-700 hover:bg-emerald-900 dark:hover:bg-emerald-600 text-white shadow-sm transition inline-flex items-center justify-center cursor-pointer" title="Settings & Login" aria-label="Settings and login">
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- LOGIN MODAL -->
+  <div id="loginModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 hidden" onclick="if(event.target===this)hideLogin()">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 w-full max-w-sm shadow-2xl relative transition-colors">
+      <h3 class="text-slate-900 dark:text-slate-100 font-extrabold text-xl mb-4 flex items-center gap-1.5">Staff Access</h3>
+      <div class="mb-4">
+        <label class="block text-slate-500 dark:text-slate-400 text-xs font-bold mb-1.5 uppercase">Username</label>
+        <input type="text" id="loginUser" class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-lg p-2.5 w-full text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition">
+      </div>
+      <div class="mb-4">
+        <label class="block text-slate-500 dark:text-slate-400 text-xs font-bold mb-1.5 uppercase">Password</label>
+        <input type="password" id="loginPass" class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-lg p-2.5 w-full text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition">
+      </div>
+      <div id="loginError" class="p-3 mb-4 rounded-lg text-sm font-semibold bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900 text-red-600 dark:text-red-400 hidden"></div>
+      <div class="flex gap-2">
+        <button class="flex-1 bg-emerald-800 dark:bg-emerald-700 text-white hover:bg-emerald-900 dark:hover:bg-emerald-600 font-semibold text-sm py-2.5 px-4 rounded-lg shadow-sm transition cursor-pointer" onclick="doLogin()">Login</button>
+        <button class="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-semibold text-sm py-2.5 px-4 rounded-lg transition cursor-pointer" onclick="hideLogin()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GLOBAL SIDEBAR -->
+  <div id="sidebar"
+    class="fixed top-0 left-0 w-80 h-screen bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-r border-slate-200 dark:border-slate-800 z-50 shadow-2xl flex flex-col transition-transform duration-300 -translate-x-full">
+    <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+      <h3 class="text-slate-800 dark:text-slate-100 font-extrabold text-lg flex items-center gap-1.5">App Settings</h3>
+      <button class="text-slate-400 hover:text-red-500 text-lg transition cursor-pointer"
+        onclick="toggleSidebar()">✕</button>
+    </div>
+    <div class="p-6 overflow-y-auto flex-1 flex flex-col gap-6">
+      <!-- Staff Login / User Info -->
+      <div class="flex flex-col gap-3">
+        <h4
+          class="text-emerald-800 dark:text-emerald-400 font-extrabold text-xs tracking-wider uppercase border-b border-slate-100 dark:border-slate-800 pb-2">
+          Staff Access</h4>
+        {% if user.user %}
+        <div
+          class="bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4 rounded-xl flex flex-col gap-2">
+          <p class="text-slate-600 dark:text-slate-300 text-sm">Logged in as: <b
+              class="text-slate-800 dark:text-slate-100">{{ user.user }}</b></p>
+          <span
+            class="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 rounded text-xs font-bold uppercase self-start">{{ user.role }}</span>
+          <button
+            class="bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-100 dark:border-red-900 font-bold text-xs py-2 px-3 rounded-lg transition mt-2 cursor-pointer"
+            onclick="logout()">Logout</button>
+        </div>
+        {% else %}
+        <div id="sidebarLoginForm" class="flex flex-col gap-3">
+          <div>
+            <label class="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase mb-1">Username</label>
+            <input type="text" id="sbUser"
+              class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-lg p-2 w-full text-sm focus:outline-none focus:border-emerald-600 transition"
+              placeholder="enter valid username">
+          </div>
+          <div>
+            <label class="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase mb-1">Password</label>
+            <input type="password" id="sbPass"
+              class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-lg p-2 w-full text-sm focus:outline-none focus:border-emerald-600 transition"
+              placeholder="Password">
+          </div>
+          <div id="sbLoginError"
+            class="p-2.5 rounded-lg text-xs font-semibold bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900 text-red-600 dark:text-red-400 hidden">
+          </div>
+          <button
+            class="bg-emerald-800 dark:bg-emerald-700 text-white hover:bg-emerald-900 dark:hover:bg-emerald-600 font-bold text-xs py-2 px-3 rounded-lg transition cursor-pointer"
+            onclick="doSidebarLogin()">Login</button>
+        </div>
+        {% endif %}
+      </div>
+      <!-- Camera Settings -->
+      <div class="flex flex-col gap-3">
+        <h4
+          class="text-emerald-800 dark:text-emerald-400 font-extrabold text-xs tracking-wider uppercase border-b border-slate-100 dark:border-slate-800 pb-2">
+          Camera & AI Model</h4>
+
+        <div>
+          <label class="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase mb-1">Model Size</label>
+          <select id="settingModel"
+            class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-lg p-2.5 w-full text-sm focus:outline-none focus:border-emerald-600 transition">
+            <option value="Medium" selected>Medium Model</option>
+            <option value="Small">Small Model</option>
+            <option value="Nano">Nano Model</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase mb-1">Camera Index</label>
+          <select id="settingCamera"
+            class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-lg p-2.5 w-full text-sm focus:outline-none focus:border-emerald-600 transition">
+            <option value="0" selected>Camera 0 (Default)</option>
+            <option value="1">Camera 1</option>
+            <option value="2">Camera 2</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase mb-1">Resolution (Image Size)</label>
+          <select id="settingRes"
+            class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-lg p-2.5 w-full text-sm focus:outline-none focus:border-emerald-600 transition">
+            <option value="640" selected>640px (High Quality)</option>
+            <option value="480">480px (Balanced)</option>
+            <option value="320">320px (Performance)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="flex justify-between text-slate-500 dark:text-slate-400 text-xs font-bold uppercase mb-1">
+            <span>Confidence Threshold</span>
+            <span id="confVal" class="text-emerald-700 dark:text-emerald-400 font-extrabold">0.50</span>
+          </label>
+          <input type="range" id="settingConf" min="0.10" max="0.90" step="0.05" value="0.50"
+            oninput="document.getElementById('confVal').textContent = parseFloat(this.value).toFixed(2)"
+            class="w-full accent-emerald-700 dark:accent-emerald-500">
+        </div>
+      </div>
+
+      <button
+        class="bg-emerald-800 dark:bg-emerald-700 text-white hover:bg-emerald-900 dark:hover:bg-emerald-600 font-bold text-sm py-2.5 px-4 rounded-lg shadow-sm transition cursor-pointer mt-2"
+        onclick="typeof applySettings === 'function' ? applySettings() : toggleSidebar()">Apply & Restart Feed</button>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <main class="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    function showLogin() { document.getElementById('loginModal').classList.remove('hidden'); document.getElementById('loginUser').focus(); }
+    function hideLogin() { document.getElementById('loginModal').classList.add('hidden'); }
+    function handleLoginSuccess(d) {
+      if (d.role === 'Administrator') {
+        location.href = '/admin';
+      } else if (d.role === 'Inventory Support') {
+        location.href = '/inventory';
+      } else if (d.role === 'Shopkeeper') {
+        location.href = '/shopkeeper';
+      } else {
+        location.reload();
+      }
+    }
+
+    async function doLogin() {
+      const user = document.getElementById('loginUser').value;
+      const pass = document.getElementById('loginPass').value;
+      const errEl = document.getElementById('loginError');
+      try {
+        const r = await fetch('/api/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username: user, password: pass}) });
+        const d = await r.json();
+        if (d.ok) { handleLoginSuccess(d); } else { errEl.textContent = d.error; errEl.classList.remove('hidden'); }
+      } catch(e) { errEl.textContent = 'Connection error'; errEl.classList.remove('hidden'); }
+    }
+    async function logout() {
+      await fetch('/api/logout', {method:'POST'});
+      location.href = '/';
+    }
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      } else {
+        html.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      }
+    }
+    let _sidebarOpen = false;
+    function toggleSidebar() {
+      _sidebarOpen = !_sidebarOpen;
+      const sb = document.getElementById('sidebar');
+      if (_sidebarOpen) {
+        sb.classList.remove('-translate-x-full');
+      } else {
+        sb.classList.add('-translate-x-full');
+      }
+    }
+    function handleSettingsBtn() {
+      toggleSidebar();
+    }
+    async function doSidebarLogin() {
+      const user = document.getElementById('sbUser').value;
+      const pass = document.getElementById('sbPass').value;
+      const errEl = document.getElementById('sbLoginError');
+      try {
+        const r = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, password: pass })
+        });
+        const d = await r.json();
+        if (d.ok) {
+          handleLoginSuccess(d);
+        } else {
+          errEl.textContent = d.error;
+          errEl.classList.remove('hidden');
+        }
+      } catch (e) {
+        errEl.textContent = 'Connection error';
+        errEl.classList.remove('hidden');
+      }
+    }
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && _sidebarOpen) {
+        const sbUser = document.getElementById('sbUser');
+        if (sbUser && (document.activeElement === sbUser || document.activeElement === document.getElementById('sbPass'))) {
+          doSidebarLogin();
+        }
+      }
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Enter' && !document.getElementById('loginModal').classList.contains('hidden')) doLogin(); });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

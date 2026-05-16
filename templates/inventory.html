@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Inventory Management - Optical Business Solutions{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Manual Inventory Management</h1>
+<p class="page-subtitle">Update stock quantities and prices manually</p>
+
+<div class="flex-between mb-2">
+  <input type="text" id="searchBox" placeholder="Search Product by Name..." style="width:300px" oninput="loadProducts()">
+</div>
+
+<div class="card">
+  <div class="card-body" style="padding:0;">
+    <div id="productTable" style="max-height:450px;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<hr class="divider">
+<h3 class="mb-1" style="color:var(--text-primary);">Quick Update</h3>
+<div class="card">
+  <div class="card-body">
+    <div class="grid-4">
+      <div class="form-group">
+        <label>Select Item</label>
+        <select id="itemSelect"></select>
+      </div>
+      <div class="form-group">
+        <label>Add Quantity</label>
+        <input type="number" id="addQty" value="0" min="0" step="1">
+      </div>
+      <div class="form-group">
+        <label>Update Price (₹)</label>
+        <input type="number" id="newPrice" value="0" min="0" step="1">
+      </div>
+      <div class="form-group">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary btn-block" onclick="saveChanges()">Save Changes</button>
+      </div>
+    </div>
+    <div id="saveMsg"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allProducts = [];
+let sortCol = 'id';
+let sortDesc = false;
+
+async function loadProducts() {
+  const q = document.getElementById('searchBox').value;
+  const url = q ? `/api/products?q=${encodeURIComponent(q)}` : '/api/products';
+  allProducts = await (await fetch(url)).json();
+  doSort();
+  renderSelect();
+}
+
+function handleSort(col) {
+  if (sortCol === col) {
+    sortDesc = !sortDesc;
+  } else {
+    sortCol = col;
+    sortDesc = false;
+  }
+  doSort();
+}
+
+function doSort() {
+  allProducts.sort((a, b) => {
+    let valA = a[sortCol];
+    let valB = b[sortCol];
+    if (typeof valA === 'string') valA = valA.toLowerCase();
+    if (typeof valB === 'string') valB = valB.toLowerCase();
+    if (valA < valB) return sortDesc ? 1 : -1;
+    if (valA > valB) return sortDesc ? -1 : 1;
+    return 0;
+  });
+  renderTable();
+}
+
+function getSortIcon(col) {
+  if (sortCol !== col) return '<span style="opacity:0.3; font-size:0.7em; margin-left:4px;">↕</span>';
+  return sortDesc ? '<span style="font-size:0.7em; margin-left:4px;">▼</span>' : '<span style="font-size:0.7em; margin-left:4px;">▲</span>';
+}
+
+function renderTable() {
+  if (!allProducts.length) {
+    document.getElementById('productTable').innerHTML = '<p class="text-muted" style="padding:1.5rem;text-align:center;">No products found in the database.</p>';
+    return;
+  }
+  let html = `<table class="data-table">
+    <thead>
+      <tr>
+        <th style="cursor:pointer; user-select:none;" onclick="handleSort('id')" title="Sort by ID">ID ${getSortIcon('id')}</th>
+        <th>Name</th>
+        <th style="cursor:pointer; user-select:none;" onclick="handleSort('price')" title="Sort by Price">Price (₹) ${getSortIcon('price')}</th>
+        <th style="cursor:pointer; user-select:none;" onclick="handleSort('quantity')" title="Sort by Quantity">Qty ${getSortIcon('quantity')}</th>
+        <th>Last Restocked</th>
+        <th style="text-align:right;">Status</th>
+      </tr>
+    </thead>
+    <tbody>`;
+  allProducts.forEach(p => {
+    html += `<tr>
+      <td>${p.id}</td>
+      <td style="font-weight:700;">${p.name}</td>
+      <td style="font-weight:600; color:var(--text-primary);">₹${p.price.toFixed(2)}</td>
+      <td style="font-weight:800; color:var(--flow-green);">${p.quantity}</td>
+      <td style="color:var(--text-muted); font-size:0.82rem;">${p.last_restocked}</td>
+      <td style="text-align:right;"><span class="${p.status==='In Stock'?'status-in':'status-out'}">${p.status}</span></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('productTable').innerHTML = html;
+}
+
+function renderSelect() {
+  const sel = document.getElementById('itemSelect');
+  sel.innerHTML = allProducts.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+}
+
+async function saveChanges() {
+  const name = document.getElementById('itemSelect').value;
+  const qty = parseInt(document.getElementById('addQty').value) || 0;
+  const price = parseFloat(document.getElementById('newPrice').value) || 0;
+  if (!name) return;
+
+  const body = { name };
+  if (price > 0) body.price = price;
+  if (qty > 0) body.add_qty = qty;
+
+  const r = await fetch('/api/products/update', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await r.json();
+  if (d.ok) {
+    document.getElementById('saveMsg').innerHTML = `<div class="alert alert-success mt-1">Updated ${name}!</div>`;
+    document.getElementById('addQty').value = 0;
+    document.getElementById('newPrice').value = 0;
+    loadProducts();
+    setTimeout(() => document.getElementById('saveMsg').innerHTML = '', 3000);
+  }
+}
+
+loadProducts();
+</script>
+{% endblock %}
