@@ -66,3 +66,5 @@ Created by forking images from multiple existing datasets from Roboflow and capt
 - `static/`: Frontend assets including style.css and store logo.
 - `weights/`:YOLO26 model weights (.pt files).
 
+ 
+ 

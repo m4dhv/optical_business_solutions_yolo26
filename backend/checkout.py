@@ -215,3 +215,5 @@ async def verify_and_finalize(request: Request):
         "receipt_url": f"/receipts/{Path(receipt_path).name}",
         "payment_id":  payment_id,
     }
+ 
+ 
