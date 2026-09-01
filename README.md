@@ -89,6 +89,7 @@ The model was trained on a custom Indian Grocery Dataset hosted on Roboflow:
    - **Shopkeeper**: Access to past transactions and shopkeeper portal
    - **Inventory Manager**: Ability to update and manage inventory manually
    - **Administrator**: Privileges of all previous roles, along with user management and system settings
+   - **NOTE**: login/logout through sidebar, default password for all roles is `123`
 
 <a id="project-structure"></a>
 ## 📁 Project Structure
@@ -111,6 +112,7 @@ optical_business_solutions_yolo26/
 ├── static/: Frontend assets, including style.css and store logo
 └── weights/: YOLO26 model weights(.pt files)
 ```
+
 <a id="acknowledgements"></a>
 ## 🙏 Acknowledgements
 
